@@ -1,0 +1,169 @@
+<!-- Shortie - Telegram Mini App HTML UI with Full Integration -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shortie</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="w-full max-w-md mx-auto">
+    <!-- Navigation Tabs -->
+    <div class="fixed bottom-0 left-0 w-full bg-white border-t flex justify-around py-2 z-10">
+      <button onclick="navigate('home')">🏠</button>
+      <button onclick="navigate('upload')">➕</button>
+      <button onclick="navigate('inbox')">💬</button>
+      <button onclick="navigate('wallet')">💰</button>
+      <button onclick="navigate('profile')">👤</button>
+    </div>
+
+    <!-- Screens -->
+    <div id="home" class="screen p-4">
+      <h2 class="text-xl font-bold mb-2">🎥 Feed</h2>
+      <div id="video-feed" class="space-y-4"></div>
+    </div>
+
+    <div id="upload" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">➕ Upload</h2>
+      <input type="file" id="video-file" accept="video/*" class="mb-2">
+      <input type="text" id="music-id" placeholder="Music ID (optional)" class="border p-1 mb-2 w-full">
+      <button onclick="uploadVideo()" class="bg-blue-500 text-white px-4 py-1 rounded">Upload</button>
+    </div>
+
+    <div id="inbox" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">💬 Inbox</h2>
+      <div id="chat-box" class="h-60 overflow-y-auto border mb-2 p-2"></div>
+      <input type="text" id="chat-message" class="border p-1 w-full" placeholder="Type a message...">
+      <button onclick="sendMessage()" class="mt-2 bg-green-500 text-white px-3 py-1 rounded">Send</button>
+    </div>
+
+    <div id="wallet" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">💰 Wallet</h2>
+      <p>Balance: <span id="balance">0</span> coins</p>
+      <button onclick="requestWithdraw()" class="mt-2 bg-yellow-500 text-white px-3 py-1 rounded">Request Withdraw</button>
+      <div id="income-history" class="mt-4"></div>
+    </div>
+
+    <div id="profile" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">👤 Profile</h2>
+      <p>Your Telegram ID: <span id="tg-id"></span></p>
+    </div>
+
+    <div id="admin" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">🧑‍💼 Admin Panel</h2>
+      <div id="withdraw-requests"></div>
+    </div>
+
+    <div id="music" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">🎵 Music Library</h2>
+      <input type="text" id="music-title" placeholder="Title" class="border p-1 mb-2 w-full">
+      <input type="file" id="music-file" accept="audio/*" class="mb-2">
+      <button onclick="uploadMusic()" class="bg-indigo-500 text-white px-4 py-1 rounded">Upload Music</button>
+      <div id="music-list" class="mt-4"></div>
+    </div>
+
+    <div id="notifications" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">🔔 Notifications</h2>
+      <ul id="notification-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const supabase = supabase.createClient('https://YOUR_PROJECT.supabase.co', 'YOUR_PUBLIC_ANON_KEY');
+    let tgUser;
+
+    window.Telegram.WebApp.ready();
+    tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+    document.getElementById('tg-id').innerText = tgUser.id;
+
+    function navigate(tab) {
+      document.querySelectorAll('.screen').forEach(div => div.classList.add('hidden'));
+      document.getElementById(tab).classList.remove('hidden');
+    }
+
+    async function loadFeed() {
+      const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+      const feed = document.getElementById('video-feed');
+      feed.innerHTML = '';
+      data.forEach(video => {
+        const div = document.createElement('div');
+        div.innerHTML = \`
+          <video src="\${video.url}" controls class="w-full"></video>
+          <button onclick="likeVideo('\${video.id}')" class="text-red-500">♥️ Like</button>
+        \`;
+        feed.appendChild(div);
+      });
+    }
+
+    async function likeVideo(videoId) {
+      await supabase.from('likes').insert({ video_id: videoId, user_id: tgUser.id });
+    }
+
+    async function uploadVideo() {
+      const file = document.getElementById('video-file').files[0];
+      const musicId = document.getElementById('music-id').value;
+      const fileExt = file.name.split('.').pop();
+      const filePath = \`\${tgUser.id}/\${Date.now()}.\${fileExt}\`;
+      await supabase.storage.from('videos').upload(filePath, file);
+      const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(filePath);
+      await supabase.from('videos').insert({ url: publicUrl, user_id: tgUser.id, music_id: musicId });
+      alert('Uploaded!');
+    }
+
+    async function sendMessage() {
+      const text = document.getElementById('chat-message').value;
+      await supabase.from('messages').insert({ sender_id: tgUser.id, receiver_id: tgUser.id, text });
+    }
+
+    async function requestWithdraw() {
+      await supabase.from('withdraw_requests').insert({ user_id: tgUser.id, amount: 50 });
+      alert('Withdraw Requested');
+    }
+
+    async function uploadMusic() {
+      const file = document.getElementById('music-file').files[0];
+      const title = document.getElementById('music-title').value;
+      const path = \`music/\${tgUser.id}-\${file.name}\`;
+      await supabase.storage.from('music').upload(path, file);
+      const { data: { publicUrl } } = supabase.storage.from('music').getPublicUrl(path);
+      await supabase.from('music_library').insert({ title, url: publicUrl, uploaded_by: tgUser.id });
+      alert('Music Uploaded');
+    }
+
+    async function loadWallet() {
+      const { data: user } = await supabase.from('users').select('*').eq('telegram_id', tgUser.id).single();
+      document.getElementById('balance').innerText = user?.balance || 0;
+      const { data: earnings } = await supabase.from('earnings').select('*').eq('user_id', tgUser.id);
+      const history = document.getElementById('income-history');
+      history.innerHTML = earnings.map(e => \`<p>\${e.type} +\${e.amount} coins</p>\`).join('');
+    }
+
+    async function loadAdminPanel() {
+      if (tgUser.username !== 'riponmondol420') return;
+      const { data } = await supabase.from('withdraw_requests').select('*').eq('status', 'pending');
+      const panel = document.getElementById('withdraw-requests');
+      panel.innerHTML = data.map(w => \`
+        <div class="border p-2 mb-2">
+          <p>User: \${w.user_id}</p>
+          <p>Amount: \${w.amount}</p>
+          <button onclick="updateWithdraw('\${w.id}', 'approved')" class="bg-green-500 text-white px-2">Approve</button>
+          <button onclick="updateWithdraw('\${w.id}', 'rejected')" class="bg-red-500 text-white px-2">Reject</button>
+        </div>
+      \`).join('');
+    }
+
+    async function updateWithdraw(id, status) {
+      await supabase.from('withdraw_requests').update({ status }).eq('id', id);
+      alert(\`Withdraw \${status}\`);
+      loadAdminPanel();
+    }
+
+    loadFeed();
+    loadWallet();
+    loadAdminPanel();
+  </script>
+</body>
+</html>
