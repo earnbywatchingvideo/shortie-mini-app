@@ -8,10 +8,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uuid@9.0.0/dist/umd/uuidv4.min.js"></script>
   <style>
-    .like-animate {
-      animation: pop 0.3s ease;
-    }
+    .like-animate { animation: pop 0.3s ease; }
     @keyframes pop {
       0% { transform: scale(1); }
       50% { transform: scale(1.3); }
@@ -21,37 +20,13 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
   <div class="w-full max-w-md mx-auto">
-    <!-- Top Bar with Search and Notification -->
-    <div class="flex justify-between items-center px-4 py-2 bg-white shadow">
-      <input type="text" placeholder="🔍 Search" class="border px-2 py-1 rounded w-2/3" id="search-input">
-      <div class="relative">
-        <button onclick="navigate('notifications')">🔔</button>
-        <span id="notification-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 hidden">0</span>
-      </div>
+    <!-- Notifications -->
+    <div id="notifications" class="screen p-4 hidden">
+      <h2 class="text-xl font-bold mb-2">🔔 Notifications</h2>
+      <ul id="notification-list" class="space-y-2"></ul>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="fixed bottom-0 left-0 w-full bg-white border-t flex justify-around py-2 z-10">
-      <button onclick="navigate('home')">🏠</button>
-      <button onclick="navigate('upload')">➕</button>
-      <button onclick="navigate('inbox')">💬</button>
-      <button onclick="navigate('wallet')">💰</button>
-      <button onclick="navigate('profile')">👤</button>
-    </div>
-
-    <!-- Screens -->
-    <div id="home" class="screen p-4"> 
-      <h2 class="text-xl font-bold mb-2">🎥 Feed</h2>
-      <div id="video-feed" class="space-y-4"></div>
-    </div>
-
-    <div id="upload" class="screen p-4 hidden">
-      <h2 class="text-xl font-bold mb-2">➕ Upload</h2>
-      <input type="file" id="video-file" accept="video/*" class="mb-2">
-      <input type="text" id="music-id" placeholder="Music ID (optional)" class="border p-1 mb-2 w-full">
-      <button onclick="uploadVideo()" class="bg-blue-500 text-white px-4 py-1 rounded">Upload</button>
-    </div>
-
+    <!-- Inbox -->
     <div id="inbox" class="screen p-4 hidden">
       <h2 class="text-xl font-bold mb-2">💬 Inbox</h2>
       <div id="chat-box" class="h-60 overflow-y-auto border mb-2 p-2"></div>
@@ -59,35 +34,7 @@
       <button onclick="sendMessage()" class="mt-2 bg-green-500 text-white px-3 py-1 rounded">Send</button>
     </div>
 
-    <div id="wallet" class="screen p-4 hidden">
-      <h2 class="text-xl font-bold mb-2">💰 Wallet</h2>
-      <p>Balance: <span id="balance">0</span> coins</p>
-      <input type="text" id="withdraw-number" placeholder="bKash/Nagad Number" class="border p-1 mb-2 w-full">
-      <select id="withdraw-method" class="border p-1 mb-2 w-full">
-        <option value="bkash">bKash</option>
-        <option value="nagad">Nagad</option>
-      </select>
-      <input type="number" id="withdraw-amount" placeholder="Amount" class="border p-1 mb-2 w-full">
-      <button onclick="requestWithdraw()" class="bg-yellow-500 text-white px-3 py-1 rounded">Request Withdraw</button>
-      <div id="income-history" class="mt-4"></div>
-    </div>
-
-    <div id="profile" class="screen p-4 hidden">
-      <h2 class="text-xl font-bold mb-2">👤 Profile</h2>
-      <p>Your Telegram ID: <span id="tg-id"></span></p>
-      <button onclick="navigate('admin')" class="mt-2 bg-purple-500 text-white px-3 py-1 rounded">Go to Admin Panel</button>
-    </div>
-
-    <div id="admin" class="screen p-4 hidden">
-      <h2 class="text-xl font-bold mb-2">🧑‍💼 Admin Panel</h2>
-      <div class="flex gap-2 mb-2">
-        <button onclick="filterWithdraws('pending')" class="bg-yellow-500 text-white px-2 rounded">Pending</button>
-        <button onclick="filterWithdraws('approved')" class="bg-green-500 text-white px-2 rounded">Approved</button>
-        <button onclick="filterWithdraws('rejected')" class="bg-red-500 text-white px-2 rounded">Rejected</button>
-      </div>
-      <div id="withdraw-requests"></div>
-    </div>
-
+    <!-- Music -->
     <div id="music" class="screen p-4 hidden">
       <h2 class="text-xl font-bold mb-2">🎵 Music Library</h2>
       <input type="text" id="music-title" placeholder="Title" class="border p-1 mb-2 w-full">
@@ -95,30 +42,41 @@
       <button onclick="uploadMusic()" class="bg-indigo-500 text-white px-4 py-1 rounded">Upload Music</button>
       <div id="music-list" class="mt-4"></div>
     </div>
-
-    <div id="notifications" class="screen p-4 hidden">
-      <h2 class="text-xl font-bold mb-2">🔔 Notifications</h2>
-      <ul id="notification-list"></ul>
-    </div>
   </div>
 
   <script>
-    const supabase = supabase.createClient('https://ydtpzbwauxqxqouysaau.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkdHB6YndhdXhxeHFvdXlzYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNjI0MjIsImV4cCI6MjA2NDczODQyMn0.mAUxZcqBLQdzOih6Ty2Eoy_vXmR94BwAcTCQ1j2_1M0');
-    let tgUser;
+    const supabase = supabase.createClient(
+      'https://ydtpzbwauxqxqouysaau.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkdHB6YndhdXhxeHFvdXlzYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNjI0MjIsImV4cCI6MjA2NDczODQyMn0.mAUxZcqBLQdzOih6Ty2Eoy_vXmR94BwAcTCQ1j2_1M0'
+    );
 
+    let tgUser;
     window.Telegram.WebApp.ready();
     tgUser = window.Telegram.WebApp.initDataUnsafe.user;
-    document.getElementById('tg-id').innerText = tgUser.id;
 
-    function navigate(tab) {
-      document.querySelectorAll('.screen').forEach(div => div.classList.add('hidden'));
-      document.getElementById(tab).classList.remove('hidden');
+    async function sendMessage() {
+      const text = document.getElementById('chat-message').value;
+      const { error } = await supabase.from('messages').insert({
+        sender_id: tgUser.id,
+        message: text
+      });
+      if (!error) document.getElementById('chat-message').value = '';
     }
 
-    async function uploadVideo() {
-      const file = document.getElementById('video-file').files[0];
-      if (!file) return alert('Select a video file');
+    supabase.channel('messages').on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'messages'
+    }, payload => {
+      const msg = payload.new;
+      const chat = document.getElementById('chat-box');
+      chat.innerHTML += `<p><b>${msg.sender_id}</b>: ${msg.message}</p>`;
+      chat.scrollTop = chat.scrollHeight;
+    }).subscribe();
 
+    async function uploadMusic() {
+      const title = document.getElementById('music-title').value;
+      const file = document.getElementById('music-file').files[0];
       const formData = new FormData();
       formData.append('file', file);
       formData.append('upload_preset', 'shortie_miniapp');
@@ -129,82 +87,28 @@
       });
 
       const data = await res.json();
-      if (data.secure_url) {
-        await supabase.from('videos').insert({
-          user_id: tgUser.id,
-          video_url: data.secure_url,
-          music_id: document.getElementById('music-id').value || null
-        });
-        alert('Video uploaded!');
-        loadVideos();
-        navigate('home');
-      } else {
-        alert('Upload failed');
-      }
-    }
-
-    async function loadVideos() {
-      const { data, error } = await supabase.from('videos').select('*').order('id', { ascending: false });
-      const container = document.getElementById('video-feed');
-      container.innerHTML = data.map(v => `
-        <div class="bg-white rounded shadow p-2">
-          <video controls src="${v.video_url}" class="w-full h-64 object-cover"></video>
-        </div>
-      `).join('');
-    }
-
-    async function requestWithdraw() {
-      const number = document.getElementById('withdraw-number').value;
-      const method = document.getElementById('withdraw-method').value;
-      const amount = parseFloat(document.getElementById('withdraw-amount').value);
-
-      const { error } = await supabase.from('withdraw_requests').insert({
+      await supabase.from('music_library').insert({
         user_id: tgUser.id,
-        status: 'pending',
-        number,
-        method,
-        amount
+        title,
+        url: data.secure_url
       });
-
-      if (error) {
-        alert('Error sending withdraw request');
-      } else {
-        alert('Withdraw request sent');
-      }
     }
 
-    async function filterWithdraws(status) {
-      const { data } = await supabase.from('withdraw_requests').select('*').eq('status', status);
-      const panel = document.getElementById('withdraw-requests');
-      panel.innerHTML = data.map(w => `
-        <div class="border p-2 mb-2">
-          <p>User: ${w.user_id}</p>
-          <p>Amount: ${w.amount}</p>
-          <p>Method: ${w.method}</p>
-          <p>Number: ${w.number}</p>
-          <p>Status: ${w.status}</p>
-          ${w.status === 'pending' ? `
-          <button onclick="updateWithdraw('${w.id}', 'approved')" class="bg-green-500 text-white px-2">Approve</button>
-          <button onclick="updateWithdraw('${w.id}', 'rejected')" class="bg-red-500 text-white px-2">Reject</button>
-          ` : ''}
-        </div>
-      `).join('');
+    async function loadNotifications() {
+      const { data } = await supabase.from('notifications').select('*').eq('user_id', tgUser.id);
+      const list = document.getElementById('notification-list');
+      list.innerHTML = data.map(n => `<li class="border p-2">${n.text}</li>`).join('');
     }
 
-    async function loadAdminPanel() {
-      if (tgUser.username !== 'riponmondol420') return;
-      navigate('admin');
-      filterWithdraws('pending');
+    async function approveWithdraw(id) {
+      await supabase.from('withdraw_requests').update({ status: 'approved' }).eq('id', id);
+      await supabase.from('notifications').insert({ user_id: tgUser.id, text: `Withdraw #${id} approved` });
     }
 
-    async function updateWithdraw(id, status) {
-      await supabase.from('withdraw_requests').update({ status }).eq('id', id);
-      alert(`Withdraw ${status}`);
-      filterWithdraws(status);
+    async function rejectWithdraw(id) {
+      await supabase.from('withdraw_requests').update({ status: 'rejected' }).eq('id', id);
+      await supabase.from('notifications').insert({ user_id: tgUser.id, text: `Withdraw #${id} rejected` });
     }
-
-    loadVideos();
-    loadAdminPanel();
   </script>
 </body>
 </html>
