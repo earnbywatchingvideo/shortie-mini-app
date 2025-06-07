@@ -115,6 +115,44 @@
       document.getElementById(tab).classList.remove('hidden');
     }
 
+    async function uploadVideo() {
+      const file = document.getElementById('video-file').files[0];
+      if (!file) return alert('Select a video file');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'shortie_miniapp');
+
+      const res = await fetch('https://api.cloudinary.com/v1_1/djxcrk7yo/video/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (data.secure_url) {
+        await supabase.from('videos').insert({
+          user_id: tgUser.id,
+          video_url: data.secure_url,
+          music_id: document.getElementById('music-id').value || null
+        });
+        alert('Video uploaded!');
+        loadVideos();
+        navigate('home');
+      } else {
+        alert('Upload failed');
+      }
+    }
+
+    async function loadVideos() {
+      const { data, error } = await supabase.from('videos').select('*').order('id', { ascending: false });
+      const container = document.getElementById('video-feed');
+      container.innerHTML = data.map(v => `
+        <div class="bg-white rounded shadow p-2">
+          <video controls src="${v.video_url}" class="w-full h-64 object-cover"></video>
+        </div>
+      `).join('');
+    }
+
     async function requestWithdraw() {
       const number = document.getElementById('withdraw-number').value;
       const method = document.getElementById('withdraw-method').value;
@@ -165,6 +203,7 @@
       filterWithdraws(status);
     }
 
+    loadVideos();
     loadAdminPanel();
   </script>
 </body>
