@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shortie</title>
+  <title>SHORTIE - Fun N Earn By Watching Video</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -62,7 +62,13 @@
     <div id="wallet" class="screen p-4 hidden">
       <h2 class="text-xl font-bold mb-2">💰 Wallet</h2>
       <p>Balance: <span id="balance">0</span> coins</p>
-      <button onclick="requestWithdraw()" class="mt-2 bg-yellow-500 text-white px-3 py-1 rounded">Request Withdraw</button>
+      <input type="text" id="withdraw-number" placeholder="bKash/Nagad Number" class="border p-1 mb-2 w-full">
+      <select id="withdraw-method" class="border p-1 mb-2 w-full">
+        <option value="bkash">bKash</option>
+        <option value="nagad">Nagad</option>
+      </select>
+      <input type="number" id="withdraw-amount" placeholder="Amount" class="border p-1 mb-2 w-full">
+      <button onclick="requestWithdraw()" class="bg-yellow-500 text-white px-3 py-1 rounded">Request Withdraw</button>
       <div id="income-history" class="mt-4"></div>
     </div>
 
@@ -109,6 +115,26 @@
       document.getElementById(tab).classList.remove('hidden');
     }
 
+    async function requestWithdraw() {
+      const number = document.getElementById('withdraw-number').value;
+      const method = document.getElementById('withdraw-method').value;
+      const amount = parseFloat(document.getElementById('withdraw-amount').value);
+
+      const { error } = await supabase.from('withdraw_requests').insert({
+        user_id: tgUser.id,
+        status: 'pending',
+        number,
+        method,
+        amount
+      });
+
+      if (error) {
+        alert('Error sending withdraw request');
+      } else {
+        alert('Withdraw request sent');
+      }
+    }
+
     async function filterWithdraws(status) {
       const { data } = await supabase.from('withdraw_requests').select('*').eq('status', status);
       const panel = document.getElementById('withdraw-requests');
@@ -116,6 +142,8 @@
         <div class="border p-2 mb-2">
           <p>User: ${w.user_id}</p>
           <p>Amount: ${w.amount}</p>
+          <p>Method: ${w.method}</p>
+          <p>Number: ${w.number}</p>
           <p>Status: ${w.status}</p>
           ${w.status === 'pending' ? `
           <button onclick="updateWithdraw('${w.id}', 'approved')" class="bg-green-500 text-white px-2">Approve</button>
@@ -137,10 +165,7 @@
       filterWithdraws(status);
     }
 
-    loadFeed();
-    loadWallet();
     loadAdminPanel();
-    loadNotifications();
   </script>
 </body>
 </html>
