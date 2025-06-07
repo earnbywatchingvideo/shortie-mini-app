@@ -4,13 +4,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shortie</title>
+  <title>SHORTIE - Fun N Earn By Watching Video</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    .like-animate {
+      animation: pop 0.3s ease;
+    }
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
   <div class="w-full max-w-md mx-auto">
+    <!-- Top Bar with Search and Notification -->
+    <div class="flex justify-between items-center px-4 py-2 bg-white shadow">
+      <input type="text" placeholder="🔍 Search" class="border px-2 py-1 rounded w-2/3" id="search-input">
+      <div class="relative">
+        <button onclick="navigate('notifications')">🔔</button>
+        <span id="notification-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 hidden">0</span>
+      </div>
+    </div>
+
     <!-- Navigation Tabs -->
     <div class="fixed bottom-0 left-0 w-full bg-white border-t flex justify-around py-2 z-10">
       <button onclick="navigate('home')">🏠</button>
@@ -21,7 +40,7 @@
     </div>
 
     <!-- Screens -->
-    <div id="home" class="screen p-4">
+    <div id="home" class="screen p-4"> 
       <h2 class="text-xl font-bold mb-2">🎥 Feed</h2>
       <div id="video-feed" class="space-y-4"></div>
     </div>
@@ -72,7 +91,7 @@
   </div>
 
   <script>
-    const supabase = supabase.createClient('https://YOUR_PROJECT.supabase.co', 'YOUR_PUBLIC_ANON_KEY');
+    const supabase = supabase.createClient('https://ydtpzbwauxqxqouysaau.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkdHB6YndhdXhxeHFvdXlzYWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNjI0MjIsImV4cCI6MjA2NDczODQyMn0.mAUxZcqBLQdzOih6Ty2Eoy_vXmR94BwAcTCQ1j2_1M0');
     let tgUser;
 
     window.Telegram.WebApp.ready();
@@ -85,31 +104,60 @@
     }
 
     async function loadFeed() {
-      const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
       const feed = document.getElementById('video-feed');
       feed.innerHTML = '';
       data.forEach(video => {
         const div = document.createElement('div');
-        div.innerHTML = \`
-          <video src="\${video.url}" controls class="w-full"></video>
-          <button onclick="likeVideo('\${video.id}')" class="text-red-500">♥️ Like</button>
-        \`;
+        div.innerHTML = `
+          <video src="${video.url}" controls class="w-full"></video>
+          <div class="flex items-center justify-between">
+            <button onclick="likeVideo('${video.id}', this)" class="text-red-500 like-btn">♥️ Like</button>
+            <button onclick="commentVideo('${video.id}')" class="text-blue-500">💬 Comment</button>
+            <button onclick="shareVideo('${video.id}')" class="text-green-500">🔗 Share</button>
+          </div>
+        `;
         feed.appendChild(div);
       });
     }
 
-    async function likeVideo(videoId) {
+    async function likeVideo(videoId, btn) {
       await supabase.from('likes').insert({ video_id: videoId, user_id: tgUser.id });
+      btn.classList.add('like-animate');
+      setTimeout(() => btn.classList.remove('like-animate'), 300);
+    }
+
+    function commentVideo(videoId) {
+      const comment = prompt('Enter your comment:');
+      if (comment) {
+        supabase.from('comments').insert({ video_id: videoId, user_id: tgUser.id, text: comment });
+        alert('Comment added');
+      }
+    }
+
+    async function shareVideo(videoId) {
+      const link = `https://shortie.app/v/${videoId}`;
+      await navigator.clipboard.writeText(link);
+      alert('Video link copied!');
     }
 
     async function uploadVideo() {
       const file = document.getElementById('video-file').files[0];
       const musicId = document.getElementById('music-id').value;
-      const fileExt = file.name.split('.').pop();
-      const filePath = \`\${tgUser.id}/\${Date.now()}.\${fileExt}\`;
-      await supabase.storage.from('videos').upload(filePath, file);
-      const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(filePath);
-      await supabase.from('videos').insert({ url: publicUrl, user_id: tgUser.id, music_id: musicId });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'shortie_miniapp');
+
+      const cloudRes = await fetch('https://api.cloudinary.com/v1_1/djxcrk7yo/video/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const cloudData = await cloudRes.json();
+      const videoUrl = cloudData.secure_url;
+
+      await supabase.from('videos').insert({ url: videoUrl, user_id: tgUser.id, music_id: musicId });
       alert('Uploaded!');
     }
 
@@ -126,10 +174,10 @@
     async function uploadMusic() {
       const file = document.getElementById('music-file').files[0];
       const title = document.getElementById('music-title').value;
-      const path = \`music/\${tgUser.id}-\${file.name}\`;
+      const path = `music/${tgUser.id}-${file.name}`;
       await supabase.storage.from('music').upload(path, file);
-      const { data: { publicUrl } } = supabase.storage.from('music').getPublicUrl(path);
-      await supabase.from('music_library').insert({ title, url: publicUrl, uploaded_by: tgUser.id });
+      const { publicURL } = supabase.storage.from('music').getPublicUrl(path).data;
+      await supabase.from('music_library').insert({ title, url: publicURL, uploaded_by: tgUser.id });
       alert('Music Uploaded');
     }
 
@@ -138,32 +186,42 @@
       document.getElementById('balance').innerText = user?.balance || 0;
       const { data: earnings } = await supabase.from('earnings').select('*').eq('user_id', tgUser.id);
       const history = document.getElementById('income-history');
-      history.innerHTML = earnings.map(e => \`<p>\${e.type} +\${e.amount} coins</p>\`).join('');
+      history.innerHTML = earnings.map(e => `<p>${e.type} +${e.amount} coins</p>`).join('');
     }
 
     async function loadAdminPanel() {
       if (tgUser.username !== 'riponmondol420') return;
       const { data } = await supabase.from('withdraw_requests').select('*').eq('status', 'pending');
       const panel = document.getElementById('withdraw-requests');
-      panel.innerHTML = data.map(w => \`
+      panel.innerHTML = data.map(w => `
         <div class="border p-2 mb-2">
-          <p>User: \${w.user_id}</p>
-          <p>Amount: \${w.amount}</p>
-          <button onclick="updateWithdraw('\${w.id}', 'approved')" class="bg-green-500 text-white px-2">Approve</button>
-          <button onclick="updateWithdraw('\${w.id}', 'rejected')" class="bg-red-500 text-white px-2">Reject</button>
+          <p>User: ${w.user_id}</p>
+          <p>Amount: ${w.amount}</p>
+          <button onclick="updateWithdraw('${w.id}', 'approved')" class="bg-green-500 text-white px-2">Approve</button>
+          <button onclick="updateWithdraw('${w.id}', 'rejected')" class="bg-red-500 text-white px-2">Reject</button>
         </div>
-      \`).join('');
+      `).join('');
     }
 
     async function updateWithdraw(id, status) {
       await supabase.from('withdraw_requests').update({ status }).eq('id', id);
-      alert(\`Withdraw \${status}\`);
+      alert(`Withdraw ${status}`);
       loadAdminPanel();
+    }
+
+    async function loadNotifications() {
+      const { data } = await supabase.from('notifications').select('*').eq('user_id', tgUser.id);
+      const list = document.getElementById('notification-list');
+      const badge = document.getElementById('notification-badge');
+      list.innerHTML = data.map(n => `<li>${n.message}</li>`).join('');
+      badge.innerText = data.length;
+      badge.style.display = data.length > 0 ? 'inline' : 'none';
     }
 
     loadFeed();
     loadWallet();
     loadAdminPanel();
+    loadNotifications();
   </script>
 </body>
 </html>
