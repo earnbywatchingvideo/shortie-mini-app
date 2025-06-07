@@ -159,6 +159,7 @@
 
       await supabase.from('videos').insert({ url: videoUrl, user_id: tgUser.id, music_id: musicId });
       alert('Uploaded!');
+      loadFeed();
     }
 
     async function sendMessage() {
@@ -224,4 +225,4 @@
     loadNotifications();
   </script>
 </body>
-</html>
+        </html>
